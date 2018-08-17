@@ -2,11 +2,14 @@ import React, { Component } from "react";
 import ReactDOM from "react-dom";
 import GoogleMapsLoader from "google-maps";
 import "./Map.css";
+import InfoWindow from "./InfoWindow";
 import { GMAPS_API_KEY } from "./googleMaps";
 
 GoogleMapsLoader.KEY = GMAPS_API_KEY;
 
 const SF_CENTER = { lat: 37.7749295, lng: -122.4194155 };
+
+const infowindowRoot = document.getElementById("infowindow-root");
 
 class Map extends Component {
   constructor(props) {
@@ -26,7 +29,7 @@ class Map extends Component {
   }
 
   onClick(event) {
-    const itemName = event.Ga.target.title;
+    const itemName = event.Fa.target.title;
     this.props.onselect(itemName);
   }
 
@@ -63,7 +66,7 @@ class Map extends Component {
   placeMarkers() {
     for (const place of this.props.locations) {
       const marker = this.getMarker(place.coordinates, place.name);
-      if (!marker.map) {
+      if (marker && !marker.map) {
         marker.setMap(this.state.map);
       }
     }
@@ -71,6 +74,9 @@ class Map extends Component {
 
   highlightSelection() {
     if (!this.props.selection) {
+      if (this.state.infowindow) {
+        this.state.infowindow.close();
+      }
       return;
     }
     const matchingMarker = this.getMarker(
@@ -81,20 +87,19 @@ class Map extends Component {
       return;
     }
     matchingMarker.setAnimation(this.state.google.maps.Animation.BOUNCE);
-    this.state.infowindow.setContent(this.infowindowContent(this.props.selection));
     this.state.infowindow.open(this.state.map, matchingMarker);
-  }
-
-  infowindowContent(place) {
-    return `<h3>${place.name}</h3><br/>${place.photoUrl}`;
   }
 
   componentDidMount() {
     GoogleMapsLoader.load(google => {
+      if (!google) {
+        this.props.reportError("Unable to load Google Maps");
+        return;
+      }
       this.setState({
         google,
         map: this.addMap(google),
-        infowindow: new google.maps.InfoWindow()
+        infowindow: new google.maps.InfoWindow({ content: infowindowRoot })
       });
       for (const place of this.props.locations) {
         this.getMarker(place.coordinates, place.name);
@@ -111,7 +116,9 @@ class Map extends Component {
   render() {
     return (
       <div id="map" className="Map" ref={element => (this.mapNode = element)}>
-        Map loading...
+        <p>Unable to load Google Maps.</p>
+        <p>Please check your internet connection and try again.</p>
+        <InfoWindow place={this.props.selection} />
       </div>
     );
   }
