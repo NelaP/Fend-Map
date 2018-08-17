@@ -1,10 +1,13 @@
 import React, { Component } from "react";
 import Map from "./Map";
 import Sidebar from "./Sidebar";
+import Modal from "react-modal";
 import "./App.css";
 import { markerNames } from "./locations";
 import { flickrForLocation } from "./flickr";
 import { geocode } from "./googleMaps";
+
+Modal.setAppElement("#app-root");
 
 class App extends Component {
   constructor(props) {
@@ -12,11 +15,26 @@ class App extends Component {
     this.state = {
       places: [],
       selected: null,
-      filter: ""
+      filter: "",
+      errorMessage: null
     };
 
     this.updateFilter = this.updateFilter.bind(this);
     this.selectLocation = this.selectLocation.bind(this);
+    this.reportError = this.reportError.bind(this);
+    this.closeErrorMessage = this.closeErrorMessage.bind(this);
+  }
+
+  reportError(message) {
+    if (this.state.errorMessage != null) {
+      // ignore additional errors
+      return;
+    }
+    this.setState({ errorMessage: message });
+  }
+
+  closeErrorMessage() {
+    this.setState({ errorMessage: null });
   }
 
   fetchLocationData() {
@@ -28,10 +46,11 @@ class App extends Component {
       markerNames.map(name => {
         const newPlace = { name };
         places.push(newPlace);
-        return geocode(name)
+        return geocode(name, this.reportError)
           .then(result => (newPlace.coordinates = result.geometry.location))
-          .then(coordinates => flickrForLocation(coordinates))
-          .then(url => (newPlace.photoUrl = url));
+          .then(coordinates => flickrForLocation(coordinates, this.reportError))
+          .then(photo => (newPlace.photo = photo))
+          .catch(error => this.reportError("External API failure"));
       })
     ).then(() => this.setState({ places }));
   }
@@ -82,7 +101,14 @@ class App extends Component {
             locations={this.placesMatchingFilter()}
             selection={this.state.selected}
             onselect={this.selectLocation}
+            reportError={this.reportError}
           />
+          <Modal isOpen={this.state.errorMessage !== null} contentLabel="Error notification">
+            <h3>Sorry, something went wrong</h3>
+            <p>Error: {this.state.errorMessage}</p>
+            <p>There may be an issue with your internet connection.</p>
+            <button onClick={this.closeErrorMessage}>Close</button>
+          </Modal>
         </div>
       </div>
     );
